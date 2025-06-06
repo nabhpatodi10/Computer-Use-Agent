@@ -1,8 +1,13 @@
 from typing import Literal
 import win32api, win32con, win32gui
+from langchain_core.tools import tool, BaseTool
 from PIL import ImageGrab
 import base64
-from langchain_core.tools import tool, BaseTool
+from langchain_openai import ChatOpenAI
+
+from nodes import Nodes
+from structures import ObjectName
+from omniparser import OmniParser
 
 class Screen:
 
@@ -18,47 +23,62 @@ class Screen:
 
 class Mouse:
 
-    def move(self, x: int, y: int) -> str:
-        """Move the mouse to the given x and y coordinates on the screen"""
-        win32api.SetCursorPos((x, y))
+    def __init__(self):
+        self.__parser = OmniParser()
+        self.__width, self.__height = Screen().get_size()
+
+    def __analyse_position(self, screen_object: str) -> tuple[int, int]:
         screenshot = ImageGrab.grab()
         screenshot.save("screenshot.jpeg")
         screenshot.close()
-        with open("screenshot.jpeg", "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode('utf-8')
+        print("screenshot saved")
 
+        items = self.__parser.parse_image("screenshot.jpeg")
+        
+        model = ChatOpenAI(model="gpt-4.1-nano", temperature=0)
+        result = model.with_structured_output(ObjectName).invoke(Nodes().mouse_functions(screen_object, items))
+        print(f"Object: {screen_object}, Name from data: {result}")
+        
+        for item in items:
+            if item["content"].lower().strip() == result.name.lower().strip():
+                coordinates = item["bbox"]
+                x = coordinates[0] + (coordinates[2] - coordinates[0]) / 2
+                y = coordinates[1] + (coordinates[3] - coordinates[1]) / 2
+                x = int(x * self.__width)
+                y = int(y * self.__height)
+                return x, y
+        else:
+            return 0, 0
 
-    def click(self, button: Literal["left", "right", "middle"], x: int, y: int) -> str:
+    def move(self, to_object: str) -> str:
+        """Move the mouse to the given object or icon on the screen"""
+        x, y = self.__analyse_position(to_object)
+        win32api.SetCursorPos((x, y))
+        return f"Moved mouse to ({to_object})"
+
+    def click(self, button: Literal["left", "right", "middle"], to_object: str) -> str:
         """Click the mouse button at the given x and y coordinates on the screen. The button can be left, right or middle."""
         if button == "left":
-            self.move(x, y)
+            self.move(to_object)
             win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0)
             win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0)
         elif button == "right":
-            self.move(x, y)
+            self.move(to_object)
             win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTDOWN, 0, 0)
             win32api.mouse_event(win32con.MOUSEEVENTF_RIGHTUP, 0, 0)
         elif button == "middle":
-            self.move(x, y)
+            self.move(to_object)
             win32api.mouse_event(win32con.MOUSEEVENTF_MIDDLEDOWN, 0, 0)
             win32api.mouse_event(win32con.MOUSEEVENTF_MIDDLEUP, 0, 0)
-        screenshot = ImageGrab.grab()
-        screenshot.save("screenshot.jpeg")
-        screenshot.close()
-        with open("screenshot.jpeg", "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode('utf-8')
+        return f"Clicked {button} button at {to_object}"
     
-    def drag(self, initial_pos: list[int, int], final_pos: list[int, int]) -> str:
+    def drag(self, from_object: str, to_object: str) -> str:
         """Drag the mouse from the initial position to the final position."""
-        self.move(*initial_pos)
+        self.move(from_object)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0)
-        self.move(*final_pos)
+        self.move(to_object)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0)
-        screenshot = ImageGrab.grab()
-        screenshot.save("screenshot.jpeg")
-        screenshot.close()
-        with open("screenshot.jpeg", "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode('utf-8')
+        return f"Dragged mouse from {from_object} to {to_object}"
 
     def scroll(self, direction: Literal["vertical", "horizontal"], delta: int) -> str:
         """Scroll the mouse in the given direction. The direction can be vertical or horizontal. To scroll down, the delta should be negative. To scroll up, the delta should be positive."""
@@ -66,28 +86,20 @@ class Mouse:
             win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, delta, 0)
         elif direction == "horizontal":
             win32api.mouse_event(win32con.MOUSEEVENTF_HWHEEL, 0, 0, delta, 0)
-        screenshot = ImageGrab.grab()
-        screenshot.save("screenshot.jpeg")
-        screenshot.close()
-        with open("screenshot.jpeg", "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode('utf-8')
+        return f"Scrolled mouse {direction} by {delta} units"
 
-    def double_click(self, button: Literal["left", "right", "middle"], x: int, y: int) -> str:
+    def double_click(self, button: Literal["left", "right", "middle"], to_object: str) -> str:
         """Double click the mouse button at the given x and y coordinates on the screen. The button can be left, right or middle."""
         if button == "left":
-            self.click("left", x, y)
-            self.click("left", x, y)
+            self.click("left", to_object)
+            self.click("left", to_object)
         elif button == "right":
-            self.click("right", x, y)
-            self.click("right", x, y)
+            self.click("right", to_object)
+            self.click("right", to_object)
         elif button == "middle":
-            self.click("middle", x, y)
-            self.click("middle", x, y)
-        screenshot = ImageGrab.grab()
-        screenshot.save("screenshot.jpeg")
-        screenshot.close()
-        with open("screenshot.jpeg", "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode('utf-8')
+            self.click("middle", to_object)
+            self.click("middle", to_object)
+        return f"Double clicked {button} button at {to_object}"
         
     def return_tools(self) -> list[BaseTool]:
         return [tool(self.move), tool(self.click), tool(self.drag), tool(self.scroll), tool(self.double_click)]
@@ -99,6 +111,7 @@ class Keyboard:
             "alt" : win32con.VK_MENU,
             "windows" : 0x5B,
             "win" : 0x5B,
+            "meta" : 0x5B,
             "space" : 0x20,
             "enter" : 0x0D,
             "backspace" : 0x08,
@@ -149,8 +162,8 @@ class Keyboard:
             ":" : ["shift", 0xBA],
             "\\" : 0xDC,
             "|" : ["shift", 0xDC],
-            "?" : 0xBF,
-            "/" : ["shift", 0xBF],
+            "/" : 0xBF,
+            "?" : ["shift", 0xBF],
             "`" : 0xC0,
             "~" : ["shift", 0xC0],
             "[" : 0xDB,
@@ -173,11 +186,7 @@ class Keyboard:
             else:
                 win32api.keybd_event(ord(key.upper()), 0, 0, 0)
                 win32api.keybd_event(ord(key.upper()), 0, win32con.KEYEVENTF_KEYUP, 0)
-            screenshot = ImageGrab.grab()
-            screenshot.save("screenshot.jpeg")
-            screenshot.close()
-            with open("screenshot.jpeg", "rb") as image_file:
-                return base64.b64encode(image_file.read()).decode('utf-8')
+            return f"Pressed key {key}"
         except Exception as e:
             raise e
 
@@ -186,18 +195,18 @@ class Keyboard:
         for key in keys:
             if key in self.keys.keys():
                 win32api.keybd_event(self.keys[key], 0, 0, 0)
+            elif isinstance(key, int):
+                win32api.keybd_event(key, 0, 0, 0)
             else:
                 win32api.keybd_event(ord(key.upper()), 0, 0, 0)
         for key in keys[-1::-1]:
             if key in self.keys.keys():
                 win32api.keybd_event(self.keys[key], 0, win32con.KEYEVENTF_KEYUP, 0)
+            elif isinstance(key, int):
+                win32api.keybd_event(key, 0, win32con.KEYEVENTF_KEYUP, 0)
             else:
                 win32api.keybd_event(ord(key.upper()), 0, win32con.KEYEVENTF_KEYUP, 0)
-        screenshot = ImageGrab.grab()
-        screenshot.save("screenshot.jpeg")
-        screenshot.close()
-        with open("screenshot.jpeg", "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode('utf-8')
+        return f"Pressed key combination {str(keys)}"
 
     def type_string(self, text: str) -> str:
         """Type the given string on the keyboard. The string can be any string, including letters, numbers, symbols, spaces and newline character (\\n) and tabs (\\t) as well."""
@@ -208,11 +217,7 @@ class Keyboard:
                 self.key_combination(["shift", char])
             else:
                 self.press_key(char)
-        screenshot = ImageGrab.grab()
-        screenshot.save("screenshot.jpeg")
-        screenshot.close()
-        with open("screenshot.jpeg", "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode('utf-8')
+        return f"Typed string {text}"
         
     def return_tools(self) -> list[BaseTool]:
         return [tool(self.press_key), tool(self.key_combination), tool(self.type_string)]
