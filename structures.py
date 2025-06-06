@@ -13,3 +13,6 @@ class Plan(BaseModel):
     
 class Replan(BaseModel):
     replan: Union[bool, Plan] = Field(description="If replanning required, it will be a new detailed step by step plan, else it will be false to denote that the entire plan has been followed or true if there are steps left to be followed.")
+
+class ObjectName(BaseModel):
+    name: str = Field(description="The name of the object or icon found in the screen")
