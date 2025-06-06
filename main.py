@@ -1,4 +1,6 @@
 from graph import Graph
 from langchain_core.messages import HumanMessage
 
-Graph().graph.invoke({"task" : "open github.com on edge, to open edge use the windows key and then search edge", "messages" : [HumanMessage(content="Task: open github.com on edge, to open edge use the windows key and then search edge")]})
+task = "search for github.com/nabhpatodi10 on edge browser"
+
+Graph().graph.invoke({"task" : task, "messages" : [HumanMessage(content=f"Task: {task}")]}, {"recursion_limit": 100})
