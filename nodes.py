@@ -3,10 +3,10 @@ from langchain_core.messages import SystemMessage, HumanMessage, AnyMessage
 from structures import Plan
 
 class Nodes:
-    def agent_message(self, screen_size: tuple[int, int], plan: Plan, image: str) -> list[AnyMessage]:
+    def agent_message(self, screen_size: tuple[int, int], task: str, plan: Plan, image: str) -> list[AnyMessage]:
         message = [
             SystemMessage(
-                content=f"""You are an expert computer user who has to use a computer to perform the given task or a step. Your job is to follow the given plan using the mouse \
+                content=f"""You are an expert computer user who has to use a computer to perform the given task. Your job is to follow the given plan using the mouse \
                 and keyboard actions. You can use the mouse to perform the following actions: move the mouse, left, right or middle click, double click, verticle and horizontal \
                 scroll. You can use the keyboard to perform the followig actions: press a key, type a string, press a key combination. To perform these actions, you have the \
                 access to the following tools:
@@ -27,16 +27,18 @@ class Nodes:
                 
                 - type_string(string: str) - Type the given string on the keyboard. The string can be any string, including letters, numbers, symbols, spaces and newline character (\\n) and tabs (\\t) as well. It should not be the ASCII code or any other code, it should be the string itself.
                 
-                You will get the initial screenshot of the screen and the plan to follow, you have to analyse the screenshot and decide what tools have to be called with what values. \
+                You will get the initial screenshot of the screen, the task and the plan to follow, you have to analyse the screenshot and decide what tools have to be called with what values. \
                 It is preferred that you call one tool at a time and analyse the output of each tool call and then accordingly call the next tool. Each tool will also return a \
                 screenshot of the screen after performing the action. You can use this screenshot to decide what to do next. The size of the scrren of the computer is: \
-                {screen_size[0], screen_size[1]}. The coordinates are to be taken from the top left corner of the screen.
+                {screen_size[0], screen_size[1]}.
                 
-                Based on the output of the tools after tool calls, respond with what action was performed."""
+                Decide the next action or tool call based on the current screen. The final goal is to complete the task given to you. If you have to perform additional or intermediate \
+                steps other than those mentioned in the plan to complete the task, you can do that as well. Perform the next action or tool call only after properly analysing the current \
+                screen. Prefer to use keyboard actions over mouse actions, use mouse when absolutely necessary."""
             ),
             HumanMessage(
                 content=[
-                    {"type" : "text", "text" : f"Please follow the following plan:\n{plan.as_str}\n\nAlso, the following is the screenshot of the screen:\n"},
+                    {"type" : "text", "text" : f"The task given by the user is: {task}\n\nThe plan to complete this task is:\n{plan.as_str}\n\nAlso, the following is the screenshot of the screen:\n"},
                     {"type" : "image_url",
                     "image_url" : {"url" : f"data:image/jpeg;base64,{image}"}},
                 ]
@@ -48,9 +50,9 @@ class Nodes:
         message = [
             SystemMessage(
                 content="""You are an expert computer user who has to use a computer to perform the given task. Your job is to analyse the given task along with the current screen, \
-                understand what is on the screen and then develop a detailed plan to perform the task using the mouse and keyboard actions. Each step of the plan should be a single \
-                and a very simple action. You can use the mouse to perform the following actions: move the mouse, left, right or middle click, double click, verticle and horizontal \
-                scroll. You can use the keyboard to perform the followig actions: press a key, type a string, press a key combination."""
+                understand what is on the screen and then develop a detailed plan to perform the task from the current state of the screen using the mouse and keyboard actions. \
+                Each step of the plan should be a single and a very simple action. You can use the mouse to perform the following actions: move the mouse, left, right or middle \
+                click, double click, verticle and horizontal scroll. You can use the keyboard to perform the followig actions: press a key, type a string, press a key combination."""
             ),
             HumanMessage(
                 content=[{"type" : "text", "text" : f"Task: {user_input}\n\nAlso, the following is the screenshot of the screen:\n"},
@@ -66,9 +68,9 @@ class Nodes:
             SystemMessage(
                 content="""You are an expert computer user who has to analyse the given task, the plan to complete that task and the current screen of the computer. Your job is to \
                 analyse the given task and the current screen of the computer and decide if the given task was completed or not based on the current computer screen. If the task \
-                was completed, you can return boolean value True. If the task was not completed, you have to return the new plan to complete the task, do not return False. The plan \
-                should be a detailed and each step should be very simple. You can use the mouse to perform the following actions: move the mouse, left, right or middle click, double \
-                click, verticle and horizontal scroll. You can use the keyboard to perform the followig actions: press a key, type a string, press a key combination."""
+                was completed, you can return boolean value True. If the task was not completed, you have to return the boolean value False.
+                
+                Analyse the current screen properly and only then return the boolean value."""
             ),
             HumanMessage(
                 content=[{"type" : "text", "text" : f"Task: {user_input}\n\nplan: {plan}, last llm message: {last_llm_message}, and the current screen is:\n"},
@@ -92,9 +94,7 @@ class Nodes:
             ),
             HumanMessage(
                 content=[{"type" : "text", "text" : f"From the following json data, find the {screen_object} and give me the name of the object or icon \
-                corresponding to {screen_object} from the data.\n\nThe data is: {str(screen_items)}"},
-                # {"type" : "image_url",
-                # "image_url" : {"url" : f"data:image/jpeg;base64,{current_screen}"}}
+                corresponding to {screen_object} from the data.\n\nThe data is: {str(screen_items)}"}
                 ]
             )
         ]
