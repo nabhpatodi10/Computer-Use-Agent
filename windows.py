@@ -2,7 +2,6 @@ from typing import Literal
 import win32api, win32con, win32gui
 from langchain_core.tools import tool, BaseTool
 from PIL import ImageGrab
-import base64
 from langchain_openai import ChatOpenAI
 
 from nodes import Nodes
@@ -26,17 +25,17 @@ class Mouse:
     def __init__(self):
         self.__parser = OmniParser()
         self.__width, self.__height = Screen().get_size()
+        self.__model = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
+        self.__counter = 0
 
     def __analyse_position(self, screen_object: str) -> tuple[int, int]:
         screenshot = ImageGrab.grab()
         screenshot.save("screenshot.jpeg")
         screenshot.close()
-        print("screenshot saved")
 
         items = self.__parser.parse_image("screenshot.jpeg")
-        
-        model = ChatOpenAI(model="gpt-4.1-nano", temperature=0)
-        result = model.with_structured_output(ObjectName).invoke(Nodes().mouse_functions(screen_object, items))
+
+        result = self.__model.with_structured_output(ObjectName).invoke(Nodes().mouse_functions(screen_object, items))
         print(f"Object: {screen_object}, Name from data: {result}")
         
         for item in items:
@@ -46,9 +45,14 @@ class Mouse:
                 y = coordinates[1] + (coordinates[3] - coordinates[1]) / 2
                 x = int(x * self.__width)
                 y = int(y * self.__height)
+                self.__counter = 0
                 return x, y
         else:
-            return 0, 0
+            if self.__counter < 3:
+                self.__counter += 1
+                print(f"Object {screen_object} not found, trying again ({self.__counter}/3)")
+                return self.__analyse_position(screen_object)
+            return self.__width//2, self.__height
 
     def move(self, to_object: str) -> str:
         """Move the mouse to the given object or icon on the screen"""
