@@ -22,7 +22,7 @@ The Computer-Use-Agent takes a high-level task from the user (e.g., "search for 
 
 ## Project Structure
 
-*   **`main.py`**: The entry point for running the agent. Initializes the graph and invokes it with a task.
+*   **`main.py`**: The entry point for running the agent. Initializes a simple Tkinter GUI for task input and log display, initializes the graph, and invokes it with a task.
 *   **`graph.py`**: Defines the main LangGraph structure ([`Graph`](./graph.py)). It orchestrates the planning (`__plan`), agent execution (`__agent`), and replanning (`__replan`) nodes.
 *   **`agent.py`**: Contains the [`Agent`](./agent.py) class, which is a LangGraph sub-graph responsible for executing actions based on the current plan and screen state. It interacts with the LLM to decide which tool to use.
 *   **`nodes.py`**: Implements the [`Nodes`](./nodes.py) class, which provides the logic and prompts for different nodes in the main graph, such as `plan_node`, `agent_message`, and `replan_node`.
@@ -43,6 +43,7 @@ The Computer-Use-Agent takes a high-level task from the user (e.g., "search for 
     ```bash
     git clone https://github.com/microsoft/OmniParser # follow the remaining steps from the OmniParser Repository
     ```
+    Ensure that any necessary model weights for OmniParser (e.g., for YOLO, Florence2) are downloaded and placed in their expected locations (e.g., `weights/icon_detect/model.pt`, `weights/icon_caption_florence`) as per OmniParser's setup instructions.
 3.  **Create a virtual environment:**
     ```bash
     python -m venv venv
@@ -67,7 +68,7 @@ The Computer-Use-Agent takes a high-level task from the user (e.g., "search for 
 
 The agent operates based on a stateful graph defined in [`graph.py`](./graph.py):
 
-1.  **Initialization**: The [`main.py`](./main.py) script defines a task and invokes the main graph ([`Graph.graph`](./graph.py)).
+1.  **Initialization**: The [`main.py`](./main.py) script initializes the GUI, defines a task (taken from GUI input), and invokes the main graph ([`Graph.graph`](./graph.py)).
 2.  **Planning (`plan_node`)**:
     *   Takes the user's task and a current screenshot of the screen.
     *   Uses an LLM (via [`Nodes.plan_node`](./nodes.py)) to generate a [`Plan`](./structures.py) consisting of simple, actionable steps.
@@ -80,39 +81,34 @@ The agent operates based on a stateful graph defined in [`graph.py`](./graph.py)
 4.  **Replanning (`replan_node`)**:
     *   After the agent node completes its current set of actions (or if it decides the current plan segment is done), the `replan_node` is invoked.
     *   It takes the original task, the current plan, the latest screenshot, and the last message from the agent's LLM.
-    *   Uses an LLM (via [`Nodes.replan_node`](./nodes.py)) to determine if the overall task is complete.
-    *   If not complete, it can generate a new [`Plan`](./structures.py) or indicate that the existing plan should continue.
+    *   Uses an LLM (via [`Nodes.replan_node`](./nodes.py)) to determine if the overall task is complete by outputting a [`Replan`](./structures.py) object containing a boolean flag.
+    *   If the task is not complete, this flag (being `False`) signals that the process should continue, leading to a new planning phase.
 5.  **Loop or End**:
-    *   If replanning results in a new plan or continuation, the flow goes back to the `agent` node.
-    *   If the `replan_node` determines the task is complete, the graph execution ends.
+    *   If the `replan_node` determines the task is not yet complete (i.e., the `Replan` object's flag is `False`), the flow returns to the `plan_node`. The `plan_node` then generates a new plan based on the current screen and task status. This new plan is subsequently passed to the `agent` node for execution.
+    *   If the `replan_node` determines the task is complete (i.e., the `Replan` object's flag is `True`), the graph execution ends.
 
 Screenshots are captured using `PIL.ImageGrab` and saved temporarily as `screenshot.jpeg`. This image is then base64 encoded to be passed to multimodal LLMs.
 
 ## Running the Project
 
 1.  Ensure all setup steps are completed (virtual environment, dependencies, API keys, model weights).
-2.  Modify the `task` variable in [`main.py`](./main.py) to specify what you want the agent to do.
-    ```python
-    # filepath: ./main.py
-    # ...existing code...
-    task = "your desired task, e.g., open notepad and type 'hello world'"
-    # ...existing code...
-    ```
-3.  Run the `main.py` script:
+2.  Run the `main.py` script:
     ```bash
     python main.py
     ```
-    The agent will start processing the task, and you will see logs in the console indicating its progress, including plans, actions, and LLM messages.
+3.  A small GUI window will appear. Enter your desired task in the input field (e.g., "open notepad and type 'hello world'") and click "Run".
+    The agent will start processing the task, and you will see logs in the GUI's text area, indicating its progress, including plans, actions, and LLM messages.
 
 ## Key Components & Technologies
 
 *   **LangGraph**: Used to create robust, stateful agentic applications.
 *   **LangChain**: Leveraged for LLM interactions, tool definitions, and structured output parsing.
-*   **OpenAI Models**: Utilizes models like `gpt-4.1-mini` and `gpt-4.1-nano` for planning, tool use, and replanning.
-*   **[`Microsoft OmniParser`](https://github.com/microsoft/OmniParser)**: A Vision Based Model by Microsoft which converts on-screen data to LLM ready data
+*   **OpenAI Models**: Utilizes models like `gpt-4.1-nano` (for planning/replanning) and `gpt-4.1-mini` (for agent tool use and screen analysis).
+*   **[`Microsoft OmniParser`](https://github.com/microsoft/OmniParser)**: A Vision Based Model by Microsoft which converts on-screen data to LLM ready data.
 *   **Pillow (PIL)**: For capturing screenshots.
 *   **Pydantic**: For data validation and defining structured data models ([`structures.py`](./structures.py)).
 *   **Windows API**: Interacted with via `win32api`, `win32gui`, `win32con` (likely through `pywin32` library) for direct mouse and keyboard control in [`windows.py`](./windows.py).
+*   **Tkinter**: Used for the simple graphical user interface in `main.py`.
 
 ## Troubleshooting
 
@@ -120,3 +116,4 @@ Screenshots are captured using `PIL.ImageGrab` and saved temporarily as `screens
 *   **Tool Errors**: Ensure that the tools (mouse/keyboard actions) are behaving as expected. Debugging might involve checking the coordinates identified by `OmniParser` or the arguments passed to `win32api` functions.
 *   **Model Performance**: The effectiveness of the agent heavily depends on the LLM's ability to plan and use tools correctly, and on `OmniParser`'s accuracy.
 *   **Permissions**: The agent interacts directly with the OS. Ensure it has the necessary permissions if running in restricted environments.
+*   **OmniParser Setup**: If `OmniParser` fails, ensure it was cloned correctly into the project root and all its setup steps, including model weight downloads, were completed.
