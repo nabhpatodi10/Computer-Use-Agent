@@ -35,17 +35,13 @@ class Agent:
             for m in range(len(state["messages"])):
                 if isinstance(state["messages"][m], ToolMessage):
                     state["messages"][m].content = ""
-            print(f"LLM: {message.content}")
             return {"messages" : [message]}
-        except RateLimitError as error:
-            print("Got error\n", error)
-            print("retrying...")
+        except RateLimitError:
             time.sleep(20)
             message = self.__model.invoke(state["messages"])
             for m in range(len(state["messages"])):
                 if isinstance(state["messages"][m], ToolMessage):
                     state["messages"][m].content = ""
-            print(f"LLM: {message.content}")
             return {"messages" : [message]}
     
     def __take_action(self, state: AgentState):
@@ -59,11 +55,9 @@ class Agent:
                 else:
                     result = self.__tools[t["name"]].invoke(t["args"])
                 results.append(ToolMessage(tool_call_id = t["id"], name = t["name"], content = str(result)))
-            print("Back to model!")
             screenshot = ImageGrab.grab()
             screenshot.save("screenshot.jpeg")
             screenshot.close()
-            print("screenshot saved")
             with open("screenshot.jpeg", "rb") as image_file:
                 image = base64.b64encode(image_file.read()).decode('utf-8')
                 image_file.close()
