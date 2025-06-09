@@ -1,4 +1,3 @@
-from typing import Union
 from pydantic import BaseModel, Field
 
 class Step(BaseModel):
@@ -12,7 +11,7 @@ class Plan(BaseModel):
         return "\n".join([f"{i+1}. {step.step}" for i, step in enumerate(self.plan)])
     
 class Replan(BaseModel):
-    replan: Union[bool, Plan] = Field(description="If replanning required, it will be a new detailed step by step plan, else it will be false to denote that the entire plan has been followed or true if there are steps left to be followed.")
+    replan: bool = Field(description="True if the task was completed, False if the task was not completed")
 
 class ObjectName(BaseModel):
     name: str = Field(description="The name of the object or icon found in the screen")
