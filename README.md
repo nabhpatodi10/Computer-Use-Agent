@@ -15,18 +15,18 @@ The Computer-Use-Agent takes a high-level task from the user (e.g., "search for 
 
 *   **Task Planning**: Generates a sequence of actions to achieve a given task.
 *   **Screen Analysis**: Uses [`Microsoft OmniParser`](https://github.com/microsoft/OmniParser) to understand the content of the screen, including identifying icons and text.
-*   **Mouse Control**: Simulates mouse movements, clicks (left, right, middle), double-clicks, drags, and scrolls using the [`Mouse`](./windows.py) class.
+*   **Mouse Control**: Simulates mouse clicks (left, right, middle), double-clicks, drags, and scrolls using the [`Mouse`](./windows.py) class. Mouse movements are performed as part of these actions.
 *   **Keyboard Control**: Simulates key presses, key combinations, and typing strings using the [`Keyboard`](./windows.py) class.
 *   **Replanning**: Adapts the plan based on the outcome of actions and changes in the screen state.
 *   **LangGraph Integration**: Uses a stateful graph to manage the flow of planning, execution, and replanning.
 
 ## Project Structure
 
-*   **`main.py`**: The entry point for running the agent. Initializes a simple Tkinter GUI for task input and log display, initializes the graph, and invokes it with a task.
-*   **`graph.py`**: Defines the main LangGraph structure ([`Graph`](./graph.py)). It orchestrates the planning (`__plan`), agent execution (`__agent`), and replanning (`__replan`) nodes.
-*   **`agent.py`**: Contains the [`Agent`](./agent.py) class, which is a LangGraph sub-graph responsible for executing actions based on the current plan and screen state. It interacts with the LLM to decide which tool to use.
+*   **`main.py`**: The entry point for running the agent. Initializes a styled Tkinter GUI (borderless, dark-themed, specific fonts, and positioned on screen) for task input and log display, initializes the graph, and invokes it with a task.
+*   **`graph.py`**: Defines the main LangGraph structure ([`Graph`](./graph.py)). It orchestrates the planning (`__plan`), agent execution (`__agent`), and replanning (`__replan`) nodes. It defaults to using the `gpt-4.1-mini` model for planning and replanning.
+*   **`agent.py`**: Contains the [`Agent`](./agent.py) class, which is a LangGraph sub-graph responsible for executing actions based on the current plan and screen state. It interacts with an LLM (defaulting to `o4-mini`) to decide which tool to use.
 *   **`nodes.py`**: Implements the [`Nodes`](./nodes.py) class, which provides the logic and prompts for different nodes in the main graph, such as `plan_node`, `agent_message`, and `replan_node`.
-*   **`windows.py`**: Contains the [`Screen`](./windows.py), [`Mouse`](./windows.py), and [`Keyboard`](./windows.py) classes for interacting with the Windows operating system (screen capture, cursor position, mouse/keyboard events).
+*   **`windows.py`**: Contains the [`Screen`](./windows.py), [`Mouse`](./windows.py), and [`Keyboard`](./windows.py) classes for interacting with the Windows operating system (screen capture, cursor position, mouse/keyboard events). The `Mouse` class uses `gpt-4.1-mini` for object identification on the screen.
 *   **`omniparser.py`**: Implements the [`OmniParser`](./omniparser.py) class, which uses computer vision models (YOLO, Florence2) and OCR to parse the screen image and identify interactive elements.
 *   **`structures.py`**: Defines Pydantic models like [`Step`](./structures.py), [`Plan`](./structures.py), [`Replan`](./structures.py), and [`ObjectName`](./structures.py) for structured data exchange.
 *   **`.env.example`**: Example file for environment variables. Copy this to `.env` and fill in your API keys.
@@ -58,7 +58,7 @@ The Computer-Use-Agent takes a high-level task from the user (e.g., "search for 
         ```bash
         cp .env.example .env
         ```
-    *   Open `.env` and add your API keys. You will need an `OPENAI_API_KEY` for the `ChatOpenAI` models.
+    *   Open `.env` and add your API keys. You will need an `OPENAI_API_KEY` for the OpenAI models.
         ```bash
         # .env
         OPENAI_API_KEY=your_openai_api_key_here
@@ -71,17 +71,17 @@ The agent operates based on a stateful graph defined in [`graph.py`](./graph.py)
 1.  **Initialization**: The [`main.py`](./main.py) script initializes the GUI, defines a task (taken from GUI input), and invokes the main graph ([`Graph.graph`](./graph.py)).
 2.  **Planning (`plan_node`)**:
     *   Takes the user's task and a current screenshot of the screen.
-    *   Uses an LLM (via [`Nodes.plan_node`](./nodes.py)) to generate a [`Plan`](./structures.py) consisting of simple, actionable steps.
+    *   Uses an LLM (default `gpt-4.1-mini` via [`Nodes.plan_node`](./nodes.py)) to generate a [`Plan`](./structures.py) consisting of simple, actionable steps.
 3.  **Agent Execution (`agent` node)**:
     *   This node internally runs another graph defined in [`agent.py`](./agent.py).
     *   The [`Agent`](./agent.py) receives the current plan and a screenshot.
-    *   It uses an LLM (configured with tools from [`Mouse`](./windows.py) and [`Keyboard`](./windows.py)) to decide the next action based on the plan and screen.
-    *   The `Mouse.move` and other mouse methods use `Mouse.__analyse_position` (which in turn calls `OmniParser.parse_image`) to identify the coordinates of target objects on the screen.
+    *   It uses an LLM (default `o4-mini`, configured with tools from [`Mouse`](./windows.py) and [`Keyboard`](./windows.py)) to decide the next action based on the plan and screen.
+    *   Mouse action methods like `click`, `drag`, and `double_click` use `Mouse.__analyse_position` (which in turn calls `OmniParser.parse_image` and uses `gpt-4.1-mini`) to identify the coordinates of target objects on the screen.
     *   After each tool execution, a new screenshot is taken and provided back to the LLM for the next decision within the agent's loop.
 4.  **Replanning (`replan_node`)**:
     *   After the agent node completes its current set of actions (or if it decides the current plan segment is done), the `replan_node` is invoked.
     *   It takes the original task, the current plan, the latest screenshot, and the last message from the agent's LLM.
-    *   Uses an LLM (via [`Nodes.replan_node`](./nodes.py)) to determine if the overall task is complete by outputting a [`Replan`](./structures.py) object containing a boolean flag.
+    *   Uses an LLM (default `gpt-4.1-mini` via [`Nodes.replan_node`](./nodes.py)) to determine if the overall task is complete by outputting a [`Replan`](./structures.py) object containing a boolean flag.
     *   If the task is not complete, this flag (being `False`) signals that the process should continue, leading to a new planning phase.
 5.  **Loop or End**:
     *   If the `replan_node` determines the task is not yet complete (i.e., the `Replan` object's flag is `False`), the flow returns to the `plan_node`. The `plan_node` then generates a new plan based on the current screen and task status. This new plan is subsequently passed to the `agent` node for execution.
@@ -103,12 +103,12 @@ Screenshots are captured using `PIL.ImageGrab` and saved temporarily as `screens
 
 *   **LangGraph**: Used to create robust, stateful agentic applications.
 *   **LangChain**: Leveraged for LLM interactions, tool definitions, and structured output parsing.
-*   **OpenAI Models**: Utilizes models like `gpt-4.1-nano` (for planning/replanning) and `gpt-4.1-mini` (for agent tool use and screen analysis).
+*   **OpenAI Models**: Utilizes `gpt-4.1-mini` (for planning, replanning, and screen object analysis via the `Mouse` class) and `o4-mini` (for agent tool selection and execution).
 *   **[`Microsoft OmniParser`](https://github.com/microsoft/OmniParser)**: A Vision Based Model by Microsoft which converts on-screen data to LLM ready data.
 *   **Pillow (PIL)**: For capturing screenshots.
 *   **Pydantic**: For data validation and defining structured data models ([`structures.py`](./structures.py)).
 *   **Windows API**: Interacted with via `win32api`, `win32gui`, `win32con` (likely through `pywin32` library) for direct mouse and keyboard control in [`windows.py`](./windows.py).
-*   **Tkinter**: Used for the simple graphical user interface in `main.py`.
+*   **Tkinter**: Used for the graphical user interface in `main.py`.
 
 ## Troubleshooting
 
