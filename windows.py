@@ -33,14 +33,14 @@ class Mouse:
         screenshot.save("screenshot.jpeg")
         screenshot.close()
 
-        items = self.__parser.parse_image("screenshot.jpeg")
+        items, image = self.__parser.parse_image("screenshot.jpeg")
 
-        result = self.__model.with_structured_output(ObjectName).invoke(Nodes().mouse_functions(screen_object, items))
+        result = self.__model.with_structured_output(ObjectName).invoke(Nodes().mouse_functions(screen_object, items, image))
         print(f"Object: {screen_object}, Name from data: {result}")
         
         for item in items:
-            if item["content"].lower().strip() == result.name.lower().strip():
-                coordinates = item["bbox"]
+            if items[item]["content"].lower().strip() == result.name.lower().strip():
+                coordinates = items[item]["bbox"]
                 x = coordinates[0] + (coordinates[2] - coordinates[0]) / 2
                 y = coordinates[1] + (coordinates[3] - coordinates[1]) / 2
                 x = int(x * self.__width)
@@ -106,7 +106,8 @@ class Mouse:
         return f"Double clicked {button} button at {to_object}"
         
     def return_tools(self) -> list[BaseTool]:
-        return [tool(self.move), tool(self.click), tool(self.drag), tool(self.scroll), tool(self.double_click)]
+        # return [tool(self.move), tool(self.click), tool(self.drag), tool(self.scroll), tool(self.double_click)]
+        return [tool(self.click), tool(self.drag), tool(self.scroll), tool(self.double_click)]
 
 class Keyboard:
 
@@ -122,6 +123,7 @@ class Keyboard:
             "delete" : 0x2E,
             "tab" : 0x09,
             "esc" : 0x1B,
+            "escape" : 0x1B,
             "capslock" : 0x14,
             "f1" : 0x70,
             "f2" : 0x71,

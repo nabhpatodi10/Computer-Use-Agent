@@ -21,7 +21,7 @@ class GraphState(TypedDict):
 
 class Graph:
 
-    def __init__(self, model: ChatOpenAI = ChatOpenAI(model = "gpt-4.1-nano")):
+    def __init__(self, model: ChatOpenAI = ChatOpenAI(model = "gpt-4.1-mini")):
 
         __graph = StateGraph(GraphState)
         __graph.add_node("plan_node", self.__plan)
@@ -44,7 +44,7 @@ class Graph:
                 image = base64.b64encode(image_file.read()).decode('utf-8')
                 image_file.close()
             message = self.__model.with_structured_output(Plan).invoke(self.__nodes.plan_node(state["task"], image))
-            print(f"Plan: {message.as_str}")
+            print(f"Task: {state["task"]}\n\nPlan: {message.as_str}")
             return {"messages" : [message.as_str], "plan" : message}
         except RateLimitError:
             time.sleep(20)
@@ -69,7 +69,6 @@ class Graph:
         screenshot.close()
         with open("screenshot.jpeg", "rb") as image_file:
             image = base64.b64encode(image_file.read()).decode('utf-8')
-        print("last llm message: ", state["messages"][-1].content)
         try:
             __replan = self.__model.with_structured_output(Replan).invoke(self.__nodes.replan_node(state["task"], state["plan"].as_str, image, state["messages"][-1].content))
         except RateLimitError:

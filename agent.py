@@ -13,7 +13,7 @@ class AgentState(TypedDict):
 
 class Agent:
 
-    def __init__(self, tools: list, model: ChatOpenAI = ChatOpenAI(model = "gpt-4.1-mini")):
+    def __init__(self, tools: list, model: ChatOpenAI = ChatOpenAI(model = "o4-mini")):
 
         __graph = StateGraph(AgentState)
         __graph.add_node("llm", self.__call_llm)
@@ -49,7 +49,7 @@ class Agent:
             tool_calls = state["messages"][-1].tool_calls
             results = []
             for t in tool_calls:
-                print(f"Calling: {t}")
+                # print(f"Calling: {t}")
                 if not t["name"] in self.__tools:
                     result = "bad tool name, retry"
                 else:

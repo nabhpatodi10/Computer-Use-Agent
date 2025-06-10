@@ -7,11 +7,9 @@ class Nodes:
         message = [
             SystemMessage(
                 content=f"""You are an expert computer user who has to use a computer to perform the given task. Your job is to follow the given plan using the mouse \
-                and keyboard actions. You can use the mouse to perform the following actions: move the mouse, left, right or middle click, double click, verticle and horizontal \
+                and keyboard actions. You can use the mouse to perform the following actions: left, right or middle click, double click, verticle and horizontal \
                 scroll. You can use the keyboard to perform the followig actions: press a key, type a string, press a key combination. To perform these actions, you have the \
                 access to the following tools:
-                
-                - move(to_object: str) - Move the mouse to the given object or icon on the screen
                 
                 - click(button: Literal["left", "right", "middle"], to_object: str) - Click the mouse button at the given object or icon on the screen. The button can be left, right or middle.
                 
@@ -51,8 +49,9 @@ class Nodes:
             SystemMessage(
                 content="""You are an expert computer user who has to use a computer to perform the given task. Your job is to analyse the given task along with the current screen, \
                 understand what is on the screen and then develop a detailed plan to perform the task from the current state of the screen using the mouse and keyboard actions. \
-                Each step of the plan should be a single and a very simple action. You can use the mouse to perform the following actions: move the mouse, left, right or middle \
-                click, double click, verticle and horizontal scroll. You can use the keyboard to perform the followig actions: press a key, type a string, press a key combination."""
+                Each step of the plan should be a single and a very simple action. You can use the mouse to perform the following actions: left, right or middle \
+                click, double click, verticle and horizontal scroll. You can use the keyboard to perform the followig actions: press a key, type a string, press a key combination.
+                Prefer keyboard actions and shortcuts over mouse actions."""
             ),
             HumanMessage(
                 content=[{"type" : "text", "text" : f"Task: {user_input}\n\nAlso, the following is the screenshot of the screen:\n"},
@@ -81,20 +80,27 @@ class Nodes:
 
         return message
     
-    def mouse_functions(self, screen_object: str, screen_items: list) -> list[AnyMessage]:
+    def mouse_functions(self, screen_object: str, screen_items: dict, screenshot: str) -> list[AnyMessage]:
         message = [
             SystemMessage(
                 content=f"""You are an expert computer user who has to find the given object or icon. Your job is to find the given object or icon from the \
-                given json format data and return the name of the object or icon from the given json format data. The name would be the 'content' field in the \
-                json data. The json data is a list of objects, each object has a 'content' field which is the name of the object or icon. The name being \
-                returned should strictly be from the given json data, do not make up any name. Do not edit any name, give it as it is, do not remove any special \
-                characters or spaces from the name or add any, just return the name as it is in the json data. Analyse the entire josn data and find the best \
-                suited object or icon that matches the given icon or object name. There can me multiple objects or icons with similar names, give the most \
-                relevant one."""
+                given json format data and the screenshot of the screen and return the name of the object or icon from the given json format data. Based on the \
+                object to be identified, analyse the screenshot, you would find bounding boxes on all icons and objects on the screen. Each bounding box would \
+                have a number. Find the object you have been asked to identify, analyse the number of the bounding box around that and then analyse the json \
+                data. The json data would have the data for each bounding box and the name of the icon or the object would be the 'content' field for that \
+                number in the json data. The json data is a dict where the bounding box number is the key and the object or icon details are the value. Each \
+                object or icon detail is also a dict and has a 'content' field which is the name of the object or icon. You have to return the correct name of \
+                the object which you have been asked to identify. The name being returned should strictly be from the given json data, do not make up any name. \
+                Do not edit any name, give it as it is, do not remove any special characters or spaces from the name or add any, just return the name as it is \
+                in the json data. Analyse the entire josn data and find the best suited object or icon that matches the given icon or object name. There can me \
+                multiple objects or icons with similar names, give the most relevant one."""
             ),
             HumanMessage(
                 content=[{"type" : "text", "text" : f"From the following json data, find the {screen_object} and give me the name of the object or icon \
-                corresponding to {screen_object} from the data.\n\nThe data is: {str(screen_items)}"}
+                corresponding to {screen_object} from the data.\n\nThe data is: {str(screen_items)}\n\nAnd the following is the screenshot of the \
+                screen containing all the numbered bounding boxes:"},
+                {"type" : "image_url",
+                "image_url" : {"url" : f"data:image/jpeg;base64,{screenshot}"}}
                 ]
             )
         ]

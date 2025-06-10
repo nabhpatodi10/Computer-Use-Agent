@@ -31,7 +31,7 @@ def run_agent(task: str, output_widget: scrolledtext.ScrolledText) -> None:
 
 def start_task(task_entry: tk.Entry, output_widget: scrolledtext.ScrolledText) -> None:
     task = task_entry.get()
-    task_entry.config(text="")
+    task_entry.delete(0, tk.END)
     run_button.config(state=tk.DISABLED)
     if not task:
         return
@@ -77,7 +77,7 @@ if __name__ == "__main__":
         command=lambda: start_task(task_entry, output),
         bg="#4caf50",
         fg="white",
-        activebackground="#45a049",
+        activebackground="#4caf50",
         borderwidth=0,
         font=("Segoe UI", 10, "bold"),
     )
@@ -87,9 +87,9 @@ if __name__ == "__main__":
         button_frame,
         text="Close",
         command=root.destroy,
-        bg="#f44336",
+        bg="#ff4335",
         fg="white",
-        activebackground="#e53935",
+        activebackground="#ff4335",
         borderwidth=0,
         font=("Segoe UI", 10, "bold"),
     )
