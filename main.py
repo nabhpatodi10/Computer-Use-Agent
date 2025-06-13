@@ -18,9 +18,6 @@ class ConsoleRedirector:
         self.text_widget.see(tk.END)
         self.text_widget.configure(state=tk.DISABLED)
 
-    def flush(self) -> None:
-        pass
-
 def run_agent(task: str, output_widget: scrolledtext.ScrolledText) -> None:
     graph = Graph()
     graph.graph.invoke({"task": task, "messages": [HumanMessage(content=f"Task: {task}")]}, {"recursion_limit": 100})
