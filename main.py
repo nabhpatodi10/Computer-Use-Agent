@@ -33,7 +33,8 @@ def start_task(task_entry: tk.Entry, output_widget: scrolledtext.ScrolledText) -
     task = task_entry.get()
     task_entry.delete(0, tk.END)
     run_button.config(state=tk.DISABLED)
-    if not task:
+    if not task or task == "" or len(task) == 0:
+        run_button.config(state=tk.NORMAL)
         return
     Keyboard().key_combination(["win", "d"])
     thread = Thread(target=run_agent, args=(task, output_widget), daemon=True)
