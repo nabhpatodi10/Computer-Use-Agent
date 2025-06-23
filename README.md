@@ -1,6 +1,6 @@
 # Computer-Use-Agent
 
-This project implements an AI agent capable of understanding user tasks and controlling a computer's mouse and keyboard to accomplish them. It uses LangGraph to orchestrate a series of steps involving planning, acting, and replanning based on screen analysis and [`Microsoft OmniParser`](https://github.com/microsoft/OmniParser) to analyse the screen content.
+This project implements an AI agent capable of understanding user tasks and controlling a computer's mouse and keyboard to accomplish them. It uses LangGraph to orchestrate a series of steps involving planning, acting, and replanning based on screen analysis.
 
 ## Overview
 
@@ -14,21 +14,24 @@ The Computer-Use-Agent takes a high-level task from the user (e.g., "search for 
 ## Features
 
 *   **Task Planning**: Generates a sequence of actions to achieve a given task.
-*   **Screen Analysis**: Uses [`Microsoft OmniParser`](https://github.com/microsoft/OmniParser) to understand the content of the screen, including identifying icons and text.
-*   **Mouse Control**: Simulates mouse clicks (left, right, middle), double-clicks, drags, and scrolls using the [`Mouse`](./windows.py) class. Mouse movements are performed as part of these actions.
+*   **Screen Analysis**: Uses advanced vision models to understand the content of the screen.
+*   **Mouse Control**: Simulates mouse clicks, double-clicks, drags, and scrolls. It uses one of two methods for identifying object coordinates on the screen:
+    *   **Microsoft GUI-Actor (Default)**: A specialized vision model that directly identifies the coordinates of a described object.
+    *   **OmniParser + LLM**: Uses [`Microsoft OmniParser`](https://github.com/microsoft/OmniParser) to parse the screen into labeled elements, and then a separate LLM call to select the correct element.
 *   **Keyboard Control**: Simulates key presses, key combinations, and typing strings using the [`Keyboard`](./windows.py) class.
 *   **Replanning**: Adapts the plan based on the outcome of actions and changes in the screen state.
 *   **LangGraph Integration**: Uses a stateful graph to manage the flow of planning, execution, and replanning.
 
 ## Project Structure
 
-*   **`main.py`**: The entry point for running the agent. Initializes a styled Tkinter GUI (borderless, dark-themed, specific fonts, and positioned on screen) for task input and log display, initializes the graph, and invokes it with a task.
-*   **`graph.py`**: Defines the main LangGraph structure ([`Graph`](./graph.py)). It orchestrates the planning (`__plan`), agent execution (`__agent`), and replanning (`__replan`) nodes. It defaults to using the `gpt-4.1-mini` model for planning and replanning.
-*   **`agent.py`**: Contains the [`Agent`](./agent.py) class, which is a LangGraph sub-graph responsible for executing actions based on the current plan and screen state. It interacts with an LLM (defaulting to `o4-mini`) to decide which tool to use.
-*   **`nodes.py`**: Implements the [`Nodes`](./nodes.py) class, which provides the logic and prompts for different nodes in the main graph, such as `plan_node`, `agent_message`, and `replan_node`.
-*   **`windows.py`**: Contains the [`Screen`](./windows.py), [`Mouse`](./windows.py), and [`Keyboard`](./windows.py) classes for interacting with the Windows operating system (screen capture, cursor position, mouse/keyboard events). The `Mouse` class uses `gpt-4.1-mini` for object identification on the screen.
-*   **`omniparser.py`**: Implements the [`OmniParser`](./omniparser.py) class, which uses computer vision models (YOLO, Florence2) and OCR to parse the screen image and identify interactive elements.
-*   **`structures.py`**: Defines Pydantic models like [`Step`](./structures.py), [`Plan`](./structures.py), [`Replan`](./structures.py), and [`ObjectName`](./structures.py) for structured data exchange.
+*   **`main.py`**: The entry point for running the agent. Initializes a styled Tkinter GUI for task input and log display, initializes the graph, and invokes it with a task.
+*   **`graph.py`**: Defines the main LangGraph structure ([`Graph`](./graph.py)). It orchestrates the planning, agent execution, and replanning nodes. It defaults to using the `gpt-4.1-mini` model for planning and replanning.
+*   **`agent.py`**: Contains the [`Agent`](./agent.py) class, a LangGraph sub-graph responsible for executing actions based on the current plan and screen state. It interacts with an LLM (defaulting to `o4-mini`) to decide which tool to use.
+*   **`nodes.py`**: Implements the [`Nodes`](./nodes.py) class, which provides the logic and prompts for different nodes in the main graph.
+*   **`windows.py`**: Contains the [`Screen`](./windows.py), [`Mouse`](./windows.py), and [`Keyboard`](./windows.py) classes for interacting with the Windows OS. The `Mouse` class is configurable to use either `GUI-Actor` (default) or `OmniParser` for identifying object coordinates on the screen.
+*   **`guiactor.py`**: Implements the [`GUIActor`](./guiactor.py) class, a wrapper for the `microsoft/GUI-Actor-3B-Qwen2.5-VL` model, which can find the coordinates of a specific UI element on the screen given a text description.
+*   **`omniparser.py`**: Implements the [`OmniParser`](./omniparser.py) class, which provides one of the methods for screen analysis. It uses computer vision models (YOLO, Florence2) and OCR to parse the screen image and identify all interactive elements.
+*   **`structures.py`**: Defines Pydantic models like [`Step`](./structures.py), [`Plan`](./structures.py), and [`Replan`](./structures.py) for structured data exchange.
 *   **`.env.example`**: Example file for environment variables. Copy this to `.env` and fill in your API keys.
 *   **`requirements.txt`**: Lists the Python dependencies for the project.
 
@@ -39,11 +42,18 @@ The Computer-Use-Agent takes a high-level task from the user (e.g., "search for 
     git clone https://github.com/nabhpatodi10/Computer-Use-Agent.git
     cd Computer-Use-Agent
     ```
-2.  **Clone and Set up OmniParser Repository in the Root Folder**
-    ```bash
-    git clone https://github.com/microsoft/OmniParser # follow the remaining steps from the OmniParser Repository
-    ```
-    Ensure that any necessary model weights for OmniParser (e.g., for YOLO, Florence2) are downloaded and placed in their expected locations (e.g., `weights/icon_detect/model.pt`, `weights/icon_caption_florence`) as per OmniParser's setup instructions.
+2.  **Set up for Screen Parsing (Choose one or both):**
+    *   **GUI-Actor (Default)**: Download and setup the repository, the model weights will be downloaded on first run.
+        ```bash
+        git clone https://github.com/microsoft/GUI-Actor.git # follow the remaining steps from the GUI-Actor Repository
+        ```
+        You would only need the gui_actor folder in the root directory
+    *   **OmniParser (Optional)**: If you want to use OmniParser, you need to set it up.
+        ```bash
+        git clone https://github.com/microsoft/OmniParser.git # follow the remaining steps from the OmniParser Repository
+        ```
+        Ensure that any necessary model weights for OmniParser (e.g., for YOLO, Florence2) are downloaded and placed in their expected locations (e.g., `weights/icon_detect/model.pt`, `weights/icon_caption_florence`) as per OmniParser's setup instructions.
+
 3.  **Create a virtual environment:**
     ```bash
     python -m venv venv
@@ -53,6 +63,8 @@ The Computer-Use-Agent takes a high-level task from the user (e.g., "search for 
     ```bash
     pip install -r requirements.txt
     ```
+    The dependencies include libraries like `transformers`, `torch`, and `accelerate`. If you have a compatible GPU, you might want to install `flash-attn` for better performance with `GUI-Actor`: `pip install flash-attn --no-build-isolation`. The first time you run the agent with the default settings, it will download the `microsoft/GUI-Actor-3B-Qwen2.5-VL` model (approx. 3B parameters), which may take some time and requires significant disk space.
+
 5.  **Set up environment variables:**
     *   Copy `.env.example` to a new file named `.env`:
         ```bash
@@ -68,52 +80,50 @@ The Computer-Use-Agent takes a high-level task from the user (e.g., "search for 
 
 The agent operates based on a stateful graph defined in [`graph.py`](./graph.py):
 
-1.  **Initialization**: The [`main.py`](./main.py) script initializes the GUI, defines a task (taken from GUI input), and invokes the main graph ([`Graph.graph`](./graph.py)).
+1.  **Initialization**: The [`main.py`](./main.py) script initializes the GUI, defines a task, and invokes the main graph.
 2.  **Planning (`plan_node`)**:
-    *   Takes the user's task and a current screenshot of the screen.
-    *   Uses an LLM (default `gpt-4.1-mini` via [`Nodes.plan_node`](./nodes.py)) to generate a [`Plan`](./structures.py) consisting of simple, actionable steps.
+    *   Takes the user's task and a current screenshot.
+    *   Uses an LLM (`gpt-4.1-mini`) to generate a [`Plan`](./structures.py) of simple, actionable steps.
 3.  **Agent Execution (`agent` node)**:
-    *   This node internally runs another graph defined in [`agent.py`](./agent.py).
-    *   The [`Agent`](./agent.py) receives the current plan and a screenshot.
-    *   It uses an LLM (default `o4-mini`, configured with tools from [`Mouse`](./windows.py) and [`Keyboard`](./windows.py)) to decide the next action based on the plan and screen.
-    *   Mouse action methods like `click`, `drag`, and `double_click` use `Mouse.__analyse_position` (which in turn calls `OmniParser.parse_image` and uses `gpt-4.1-mini`) to identify the coordinates of target objects on the screen.
-    *   After each tool execution, a new screenshot is taken and provided back to the LLM for the next decision within the agent's loop.
+    *   This node runs a sub-graph defined in [`agent.py`](./agent.py).
+    *   It uses an LLM (`o4-mini`) with tools from [`Mouse`](./windows.py) and [`Keyboard`](./windows.py) to decide the next action.
+    *   Mouse actions like `click` and `drag` require coordinates for the target object. The [`Mouse`](./windows.py) class (defaulting to `GUI-Actor`) obtains these coordinates:
+        *   **`GUI-Actor`**: The `__give_coordinates` method passes the screenshot and object description directly to the `GUI-Actor` model, which returns the precise coordinates.
+        *   **`OmniParser`**: The `__analyse_position` method first uses `OmniParser` to get a list of all labeled elements on the screen, and then makes a call to `gpt-4.1-mini` to select the best match for the target object from that list.
+    *   After each tool execution, a new screenshot is taken and fed back to the LLM for the next decision.
 4.  **Replanning (`replan_node`)**:
-    *   After the agent node completes its current set of actions (or if it decides the current plan segment is done), the `replan_node` is invoked.
-    *   It takes the original task, the current plan, the latest screenshot, and the last message from the agent's LLM.
-    *   Uses an LLM (default `gpt-4.1-mini` via [`Nodes.replan_node`](./nodes.py)) to determine if the overall task is complete by outputting a [`Replan`](./structures.py) object containing a boolean flag.
-    *   If the task is not complete, this flag (being `False`) signals that the process should continue, leading to a new planning phase.
+    *   After the agent node completes, the `replan_node` is invoked.
+    *   It uses `gpt-4.1-mini` to determine if the overall task is complete based on the latest screen.
 5.  **Loop or End**:
-    *   If the `replan_node` determines the task is not yet complete (i.e., the `Replan` object's flag is `False`), the flow returns to the `plan_node`. The `plan_node` then generates a new plan based on the current screen and task status. This new plan is subsequently passed to the `agent` node for execution.
-    *   If the `replan_node` determines the task is complete (i.e., the `Replan` object's flag is `True`), the graph execution ends.
+    *   If the task is not complete, the flow returns to the `plan_node` to generate a new plan from the current state.
+    *   If the task is complete, the graph execution ends.
 
-Screenshots are captured using `PIL.ImageGrab` and saved temporarily as `screenshot.jpeg`. This image is then base64 encoded to be passed to multimodal LLMs.
+To switch between `GUI-Actor` and `OmniParser`, you can modify the `__init__` method of the `Mouse` class in [`windows.py`](./windows.py).
 
 ## Running the Project
 
-1.  Ensure all setup steps are completed (virtual environment, dependencies, API keys, model weights).
+1.  Ensure all setup steps are completed.
 2.  Run the `main.py` script:
     ```bash
     python main.py
     ```
-3.  A small GUI window will appear. Enter your desired task in the input field (e.g., "open notepad and type 'hello world'") and click "Run".
-    The agent will start processing the task, and you will see logs in the GUI's text area, indicating its progress, including plans, actions, and LLM messages.
+3.  A small GUI window will appear. Enter your task and click "Run". The agent will start processing, with logs appearing in the GUI.
 
 ## Key Components & Technologies
 
 *   **LangGraph**: Used to create robust, stateful agentic applications.
 *   **LangChain**: Leveraged for LLM interactions, tool definitions, and structured output parsing.
-*   **OpenAI Models**: Utilizes `gpt-4.1-mini` (for planning, replanning, and screen object analysis via the `Mouse` class) and `o4-mini` (for agent tool selection and execution).
-*   **[`Microsoft OmniParser`](https://github.com/microsoft/OmniParser)**: A Vision Based Model by Microsoft which converts on-screen data to LLM ready data.
+*   **OpenAI Models**: Utilizes `gpt-4.1-mini` (for planning, replanning, and optionally for screen object analysis if using the `OmniParser` method) and `o4-mini` (for agent tool selection and execution).
+*   **Microsoft GUI-Actor**: A specialized 3B parameter vision-language model (`Qwen2.5-VL` base) for identifying UI elements on a screen.
+*   **[`Microsoft OmniParser`](https://github.com/microsoft/OmniParser)**: An alternative, vision-based screen parser that converts on-screen data into a structured list of elements.
 *   **Pillow (PIL)**: For capturing screenshots.
-*   **Pydantic**: For data validation and defining structured data models ([`structures.py`](./structures.py)).
-*   **Windows API**: Interacted with via `win32api`, `win32gui`, `win32con` (likely through `pywin32` library) for direct mouse and keyboard control in [`windows.py`](./windows.py).
-*   **Tkinter**: Used for the graphical user interface in `main.py`.
+*   **Pydantic**: For data validation and defining structured data models.
+*   **Windows API**: Interacted with via `pywin32` for direct mouse and keyboard control.
+*   **Tkinter**: Used for the graphical user interface.
 
 ## Troubleshooting
 
-*   **RateLimitError**: The agent makes multiple calls to LLMs. If you encounter rate limit errors, you might need to add delays or check your API plan limits. The code has some basic `time.sleep(20)` handlers for this.
-*   **Tool Errors**: Ensure that the tools (mouse/keyboard actions) are behaving as expected. Debugging might involve checking the coordinates identified by `OmniParser` or the arguments passed to `win32api` functions.
-*   **Model Performance**: The effectiveness of the agent heavily depends on the LLM's ability to plan and use tools correctly, and on `OmniParser`'s accuracy.
-*   **Permissions**: The agent interacts directly with the OS. Ensure it has the necessary permissions if running in restricted environments.
-*   **OmniParser Setup**: If `OmniParser` fails, ensure it was cloned correctly into the project root and all its setup steps, including model weight downloads, were completed.
+*   **RateLimitError**: The agent makes multiple calls to LLMs. If you encounter rate limit errors, you might need to add delays or check your API plan limits.
+*   **GUI-Actor Model**: The `GUI-Actor` model is large and requires significant VRAM (approx. 8GB) and RAM (approx. 26GB for CPU). Ensure you have sufficient resources. The first run will download the model weights. If you encounter performance issues, check your `torch` and CUDA setup. Installing `flash-attn` is recommended for GPU users.
+*   **OmniParser Setup**: If you choose to use the `OmniParser` backend, ensure it was cloned correctly into the project root and all its setup steps, including model weight downloads, were completed.
+*   **Permissions**: The agent interacts directly with the OS. Ensure it has the
