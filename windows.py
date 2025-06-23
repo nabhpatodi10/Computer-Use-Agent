@@ -7,6 +7,7 @@ from langchain_openai import ChatOpenAI
 from nodes import Nodes
 from structures import ObjectName
 from omniparser import OmniParser
+from guiactor import GUIActor
 
 class Screen:
 
@@ -22,10 +23,16 @@ class Screen:
 
 class Mouse:
 
-    def __init__(self):
-        self.__parser = OmniParser()
+    def __init__(self, choice: Literal["omni", "gui_actor"] = "gui_actor"):
         self.__width, self.__height = Screen().get_size()
         self.__model = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
+        self.__choice = choice
+        if self.__choice == "omni":
+            self.__parser = OmniParser()
+            self.__actor = None
+        elif self.__choice == "gui_actor":
+            self.__parser = None
+            self.__actor = GUIActor()
         self.__counter = 0
 
     def __analyse_position(self, screen_object: str) -> tuple[int, int]:
@@ -52,11 +59,24 @@ class Mouse:
                 self.__counter += 1
                 print(f"Object {screen_object} not found, trying again ({self.__counter}/3)")
                 return self.__analyse_position(screen_object)
-            return self.__width//2, self.__height
+            return self.__width//2, self.__height//2
+    
+    def __give_coordinates(self, object: str) -> tuple[int, int]:
+        screenshot = ImageGrab.grab()
+        screenshot.save("screenshot.jpeg")
+        screenshot.close()
+
+        x, y = self.__actor.parse_image("screenshot.jpeg", object)
+        x = int(x * self.__width)
+        y = int(y * self.__height)
+        return x, y
 
     def move(self, to_object: str) -> str:
         """Move the mouse to the given object or icon on the screen"""
-        x, y = self.__analyse_position(to_object)
+        if self.__choice == "omni":
+            x, y = self.__analyse_position(to_object)
+        elif self.__choice == "gui_actor":
+            x, y = self.__give_coordinates(to_object)
         win32api.SetCursorPos((x, y))
         return f"Moved mouse to ({to_object})"
 
