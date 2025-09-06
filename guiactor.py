@@ -5,7 +5,7 @@ from gui_actor.modeling_qwen25vl import Qwen2_5_VLForConditionalGenerationWithPo
 from gui_actor.inference import inference
 
 class GUIActor:
-    def __init__(self, model = "microsoft/GUI-Actor-3B-Qwen2.5-VL"):
+    def __init__(self, model = "microsoft/GUI-Actor-7B-Qwen2.5-VL"):
         self.__data_processor = data_processor = AutoProcessor.from_pretrained(model, max_pixels=768*768, use_fast=True)
         self.__tokenizer = data_processor.tokenizer
         __max_memory = {0: "7800MiB", "cpu": "26GiB"}
