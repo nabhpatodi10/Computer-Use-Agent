@@ -3,11 +3,14 @@ import win32api, win32con, win32gui
 from langchain_core.tools import tool, BaseTool
 from PIL import ImageGrab
 from langchain_openai import ChatOpenAI
+from pydantic import BaseModel, Field
 
 from nodes import Nodes
-from structures import ObjectName
 from omniparser import OmniParser
 from guiactor import GUIActor
+
+class ObjectName(BaseModel):
+    name: str = Field(description="The name of the object or icon found in the screen")
 
 class Screen:
 
@@ -25,7 +28,7 @@ class Mouse:
 
     def __init__(self, choice: Literal["omni", "gui_actor"] = "gui_actor"):
         self.__width, self.__height = Screen().get_size()
-        self.__model = ChatOpenAI(model="gpt-4.1-mini", temperature=0)
+        self.__model = ChatOpenAI(model="gpt-5-mini", reasoning_effort="minimal")
         self.__choice = choice
         if self.__choice == "omni":
             self.__parser = OmniParser()
@@ -126,7 +129,6 @@ class Mouse:
         return f"Double clicked {button} button at {to_object}"
         
     def return_tools(self) -> list[BaseTool]:
-        # return [tool(self.move), tool(self.click), tool(self.drag), tool(self.scroll), tool(self.double_click)]
         return [tool(self.click), tool(self.drag), tool(self.scroll), tool(self.double_click)]
 
 class Keyboard:
