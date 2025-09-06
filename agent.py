@@ -2,18 +2,16 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import AnyMessage, ToolMessage
 from typing import Annotated, TypedDict
-import operator
-import time
+import operator, time, base64
 from openai import RateLimitError
 from PIL import ImageGrab
-import base64
 
 class AgentState(TypedDict):
     messages: Annotated[list[AnyMessage], operator.add]
 
 class Agent:
 
-    def __init__(self, tools: list, model: ChatOpenAI = ChatOpenAI(model = "o4-mini")):
+    def __init__(self, tools: list, model: ChatOpenAI = ChatOpenAI(model = "gpt-5", reasoning_effort="minimal")):
 
         __graph = StateGraph(AgentState)
         __graph.add_node("llm", self.__call_llm)
@@ -49,13 +47,14 @@ class Agent:
             tool_calls = state["messages"][-1].tool_calls
             results = []
             for t in tool_calls:
-                # print(f"Calling: {t}")
+                print(f"Calling: {t}")
                 if not t["name"] in self.__tools:
                     result = "bad tool name, retry"
                 else:
                     result = self.__tools[t["name"]].invoke(t["args"])
                 results.append(ToolMessage(tool_call_id = t["id"], name = t["name"], content = str(result)))
             screenshot = ImageGrab.grab()
+            time.sleep(1)
             screenshot.save("screenshot.jpeg")
             screenshot.close()
             with open("screenshot.jpeg", "rb") as image_file:
