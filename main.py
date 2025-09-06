@@ -1,12 +1,16 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 import tkinter as tk
 from tkinter import scrolledtext
 import tkinter.font as tkfont
 from threading import Thread
-import sys
+import sys, base64
+from PIL import ImageGrab
 
-from graph import Graph
-from langchain_core.messages import HumanMessage
-from windows import Keyboard
+from agent import Agent
+from nodes import Nodes
+from windows import Keyboard, Mouse, Screen
 
 class ConsoleRedirector:
     def __init__(self, text_widget: scrolledtext.ScrolledText) -> None:
@@ -22,8 +26,17 @@ class ConsoleRedirector:
         pass
 
 def run_agent(task: str, output_widget: scrolledtext.ScrolledText) -> None:
-    graph = Graph()
-    graph.graph.invoke({"task": task, "messages": [HumanMessage(content=f"Task: {task}")]}, {"recursion_limit": 100})
+    __tools = Mouse().return_tools() + Keyboard().return_tools()
+    __agent = Agent(__tools)
+    screenshot = ImageGrab.grab()
+    screenshot.save("screenshot.jpeg")
+    screenshot.close()
+    with open("screenshot.jpeg", "rb") as image_file:
+        image = base64.b64encode(image_file.read()).decode('utf-8')
+        image_file.close()
+    print(f"Starting task: {task}\n")
+    __messages = __agent.graph.invoke({"messages" : Nodes().agent_message(Screen().get_size(), task, image)}, {"recursion_limit" : 100})
+    print(__messages["messages"][-1].content)
     output_widget.configure(state=tk.NORMAL)
     output_widget.insert(tk.END, "\nTask completed\n")
     run_button.config(state=tk.NORMAL)
