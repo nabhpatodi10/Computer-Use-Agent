@@ -3,3 +3,5 @@ Lib
 Scripts
 .env
 *.cfg
+*.db
+__pycache__
