@@ -4,4 +4,7 @@ Scripts
 .env
 *.cfg
 *.db
+*.db-shm
+*.db-wal
 __pycache__
+agent_workspace
