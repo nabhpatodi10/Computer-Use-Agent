@@ -1,10 +1,16 @@
+import re
 from abc import ABC, abstractmethod
 
 from langchain_community.chat_message_histories import SQLChatMessageHistory
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import BaseMessage, HumanMessage
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from settings import settings
+
+
+def _normalize_name(name: str) -> str:
+    """OpenAI requires message.name to match ^[^\\s<|\\\\/>]+$ — strip disallowed chars."""
+    return re.sub(r"[\s<|\\/>]+", "_", name.strip())
 
 
 class BaseChatRepository(ABC):
@@ -17,7 +23,7 @@ class BaseChatRepository(ABC):
 
 class UserChatRepository(BaseChatRepository):
     def __init__(self, session_id: str, engine: AsyncEngine) -> None:
-        self._user_name = settings.user_name
+        self._user_name = _normalize_name(settings.user_name)
         self._history = SQLChatMessageHistory(
             session_id=session_id,
             connection=engine,
@@ -26,7 +32,8 @@ class UserChatRepository(BaseChatRepository):
         )
 
     async def add_message(self, message: BaseMessage) -> None:
-        message.name = self._user_name
+        if isinstance(message, HumanMessage):
+            message.name = self._user_name
         await self._history.aadd_messages([message])
 
     async def get_messages(self) -> list[BaseMessage]:
@@ -46,7 +53,7 @@ class AgentChatRepository(BaseChatRepository):
         if message.name is None and agent_name is None:
             raise ValueError("Agent name must be provided if message does not have a name.")
         if agent_name is not None:
-            message.name = agent_name
+            message.name = _normalize_name(agent_name)
         await self._history.aadd_messages([message])
 
     async def get_messages(self, agent_name: str | None = None) -> list[BaseMessage]:

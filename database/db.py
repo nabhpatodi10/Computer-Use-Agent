@@ -1,5 +1,5 @@
 from database.chats import AgentChatRepository, UserChatRepository
-from database.connection import engine
+from database.connection import engine, get_memory_repo
 
 
 class DB:
@@ -12,3 +12,6 @@ class DB:
             session_id=session_id,
             engine=engine,
         )
+        # Memories are global (not session-scoped) but accessed via the facade
+        # for a single entry point.
+        self.memories = get_memory_repo()
