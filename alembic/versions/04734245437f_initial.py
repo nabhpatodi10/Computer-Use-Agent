@@ -26,7 +26,8 @@ def upgrade() -> None:
     sa.Column('session_id', sa.Text(), nullable=True),
     sa.Column('message', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    if_not_exists=True
     )
     with op.batch_alter_table('agent_messages', schema=None) as batch_op:
         batch_op.create_index('ix_agent_messages_session_id', ['session_id'], unique=False)
@@ -36,7 +37,8 @@ def upgrade() -> None:
     sa.Column('session_id', sa.Text(), nullable=True),
     sa.Column('message', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    if_not_exists=True
     )
     with op.batch_alter_table('user_messages', schema=None) as batch_op:
         batch_op.create_index('ix_user_messages_session_id', ['session_id'], unique=False)
@@ -50,9 +52,9 @@ def downgrade() -> None:
     with op.batch_alter_table('user_messages', schema=None) as batch_op:
         batch_op.drop_index('ix_user_messages_session_id')
 
-    op.drop_table('user_messages')
+    op.drop_table('user_messages', if_exists=True)
     with op.batch_alter_table('agent_messages', schema=None) as batch_op:
         batch_op.drop_index('ix_agent_messages_session_id')
 
-    op.drop_table('agent_messages')
+    op.drop_table('agent_messages', if_exists=True)
     # ### end Alembic commands ###
