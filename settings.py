@@ -38,6 +38,37 @@ class Settings(BaseSettings):
     skills_sources: list[str] = []
     agents_md_sources: list[str] = []
 
+    # Web search providers. Configure whichever you have; the agent uses
+    # Tavily as primary and falls back to Exa on error. Tool is only added
+    # if at least one is set.
+    tavily_api_key: SecretStr | None = None
+    exa_api_key: SecretStr | None = None
+
+    # Shell tool. Executes commands via deepagents/langchain ShellToolMiddleware.
+    # HITL kicks in only for commands matching `shell_critical_patterns`.
+    shell_enabled: bool = True
+    shell_command: str = "powershell"  # "pwsh", "bash", "cmd", etc.
+    shell_critical_patterns: list[str] = [
+        r"\brm\s+[^\n]*-[rRfF]",
+        r"\bsudo\b",
+        r"\bchmod\b",
+        r"\bchown\b",
+        r"\bdel\s+[^\n]*[/\-][fFsSqQ]",
+        r"\bformat\s+[a-zA-Z]:",
+        r"\bshutdown\b",
+        r"\breboot\b",
+        r"\bgit\s+push\b",
+        r"\bgit\s+reset\s+--hard",
+        r"\bgit\s+clean\s+-[fdxFDX]",
+        r"\bpip\s+install\b",
+        r"\bnpm\s+install\b",
+        r"\bcurl\s+[^\n]*\|\s*(sh|bash|pwsh|powershell)",
+        r"\b(iwr|irm|Invoke-WebRequest|Invoke-RestMethod)\b[^\n]*\|\s*iex",
+        r"\bRemove-Item\b[^\n]*-Recurse",
+        r">\s*/dev/",
+        r"\bdd\s+if=",
+    ]
+
     @property
     def sqlite_db_file(self) -> Path:
         path = self.sqlite_db_path
