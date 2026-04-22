@@ -1,7 +1,11 @@
 from langchain.agents import create_agent
-from langchain.agents.middleware import SummarizationMiddleware, TodoListMiddleware
+from langchain.agents.middleware import (
+    SummarizationMiddleware,
+    TodoListMiddleware,
+)
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import BaseMessage, HumanMessage
+from langgraph.types import Command
 from deepagents.backends import FilesystemBackend
 from deepagents.middleware import (
     FilesystemMiddleware,
@@ -10,8 +14,11 @@ from deepagents.middleware import (
 )
 from deepagents.middleware.patch_tool_calls import PatchToolCallsMiddleware
 
-from agents.memory_tools import build_memory_tools
-from agents.middleware import ModelSelectionMiddleware
+from agents.middleware import (
+    CriticalShellInterruptMiddleware,
+    ModelSelectionMiddleware,
+)
+from tools import build_memory_tools, build_shell_tool, build_web_search_tools
 from prompts import chatbot_prompt, memory_prompt
 from database import DB, close_connections, get_checkpointer
 from database.connection import get_memory_repo
@@ -40,7 +47,16 @@ def _build_middleware_stack(backend, fast_model, smart_model, selector_model):
 
     stack.append(FilesystemMiddleware(backend=backend))
 
-    # No SubAgentMiddleware — user will add a custom subagent system later.
+    if settings.shell_enabled:
+        # Shell tool itself is a plain tool (see tools/shell.py), not a
+        # middleware — ShellToolMiddleware stores non-serializable process
+        # state which breaks SQLite checkpointing. This middleware only gates
+        # calls to it for critical-command approval.
+        stack.append(
+            CriticalShellInterruptMiddleware(
+                critical_patterns=settings.shell_critical_patterns,
+            )
+        )
 
     stack.append(
         SummarizationMiddleware(model=fast_model, trigger=("fraction", 0.85))
@@ -83,28 +99,65 @@ async def get_agent():
         selector_model=selector_model,
     )
 
-    memory_tools = build_memory_tools(get_memory_repo())
+    tools = [
+        *build_memory_tools(get_memory_repo()),
+        *build_web_search_tools(),
+        *build_shell_tool(),
+    ]
 
     _agent = create_agent(
         model=fast_model,  # default; ModelSelectionMiddleware swaps per turn
-        tools=memory_tools,
+        tools=tools,
         system_prompt=f"{chatbot_prompt}\n\n{memory_prompt}",
         middleware=middleware,
         checkpointer=await get_checkpointer(),
+        name="chatbot-agent",
     )
     return _agent
 
 
-async def invoke(session_id: str, user_input: str) -> BaseMessage:
+def _prompt_user_for_shell_decision(payload: dict) -> dict:
+    """Default CLI-based approval prompt for a critical shell command.
+    Override by passing `approver` to `invoke()` if embedding in a UI."""
+    command = payload.get("command", "")
+    print()
+    print("=" * 70)
+    print("AGENT requests approval to run a critical shell command:")
+    print(f"  {command}")
+    print("=" * 70)
+    choice = input("Approve? [y/N] (or type a rejection reason): ").strip()
+    if choice.lower() in ("y", "yes"):
+        return {"decision": "approve"}
+    return {
+        "decision": "reject",
+        "reason": choice if choice and choice.lower() not in ("n", "no") else "rejected",
+    }
+
+
+async def invoke(
+    session_id: str,
+    user_input: str,
+    approver=_prompt_user_for_shell_decision,
+) -> BaseMessage:
     db = DB(session_id=session_id)
     user_msg = HumanMessage(content=user_input)
     await db.user_chats.add_message(user_msg)
 
     agent = await get_agent()
-    result = await agent.ainvoke(
-        {"messages": [user_msg]},
-        config={"configurable": {"thread_id": session_id}},
-    )
+    config = {"configurable": {"thread_id": session_id}}
+
+    agent_input: object = {"messages": [user_msg]}
+    while True:
+        result = await agent.ainvoke(agent_input, config=config)
+        interrupts = result.get("__interrupt__")
+        if not interrupts:
+            break
+        # Handle the (first) interrupt. langgraph pauses the graph; we resume
+        # via Command(resume=<value>).
+        payload = interrupts[0].value
+        decision = approver(payload)
+        agent_input = Command(resume=decision)
+
     response: BaseMessage = result["messages"][-1]
     response.name = "chatbot-agent"
     await db.user_chats.add_message(response)
